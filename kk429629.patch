@@ -1,0 +1,185 @@
+diff -rupNEZbB files_orig/usr/include/minix/callnr.h files_modified/usr/include/minix/callnr.h
+--- files_orig/usr/include/minix/callnr.h	2022-05-07 19:10:00.657223492 +0200
++++ files_modified/usr/include/minix/callnr.h	2022-05-07 17:11:04.951430352 +0200
+@@ -58,8 +58,9 @@
+ #define PM_GETEPINFO		(PM_BASE + 45)
+ #define PM_GETPROCNR		(PM_BASE + 46)
+ #define PM_GETSYSINFO		(PM_BASE + 47)
++#define PM_GETLCAPID		(PM_BASE + 48)
+ 
+-#define NR_PM_CALLS		48	/* highest number from base plus one */
++#define NR_PM_CALLS		49	/* highest number from base plus one */
+ 
+ /*===========================================================================*
+  *				Calls to VFS				     *
+diff -rupNEZbB files_orig/usr/include/unistd.h files_modified/usr/include/unistd.h
+--- files_orig/usr/include/unistd.h	2022-05-07 17:24:27.934540097 +0200
++++ files_modified/usr/include/unistd.h	2022-05-07 17:11:42.351575328 +0200
+@@ -411,5 +411,7 @@ extern	 int optreset;		/* getopt(3) exte
+ extern	 char *suboptarg;	/* getsubopt(3) external variable */
+ #endif
+ 
++pid_t getlcapid(pid_t, pid_t);
++
+ __END_DECLS
+ #endif /* !_UNISTD_H_ */
+diff -rupNEZbB files_orig/usr/src/include/unistd.h files_modified/usr/src/include/unistd.h
+--- files_orig/usr/src/include/unistd.h	2022-05-07 17:23:46.071044736 +0200
++++ files_modified/usr/src/include/unistd.h	2022-05-07 17:16:44.299411830 +0200
+@@ -411,5 +411,7 @@ extern	 int optreset;		/* getopt(3) exte
+ extern	 char *suboptarg;	/* getsubopt(3) external variable */
+ #endif
+ 
++pid_t getlcapid(pid_t, pid_t);
++
+ __END_DECLS
+ #endif /* !_UNISTD_H_ */
+diff -rupNEZbB files_orig/usr/src/lib/libc/misc/getlcapid.c files_modified/usr/src/lib/libc/misc/getlcapid.c
+--- files_orig/usr/src/lib/libc/misc/getlcapid.c	1970-01-01 01:00:00.000000000 +0100
++++ files_modified/usr/src/lib/libc/misc/getlcapid.c	2022-05-08 16:36:16.796361959 +0200
+@@ -0,0 +1,12 @@
++#include <sys/types.h>
++#include <unistd.h>
++#include <lib.h>
++
++pid_t getlcapid(pid_t pid_1, pid_t pid_2)
++{   
++    message m;
++    m.m1_i1 = pid_1;
++    m.m1_i2 = pid_2;
++
++    return _syscall(PM_BASE, PM_GETLCAPID, &m);
++}
+diff -rupNEZbB files_orig/usr/src/lib/libc/misc/Makefile.inc files_modified/usr/src/lib/libc/misc/Makefile.inc
+--- files_orig/usr/src/lib/libc/misc/Makefile.inc	2022-05-07 17:24:45.864609493 +0200
++++ files_modified/usr/src/lib/libc/misc/Makefile.inc	2022-05-07 17:10:00.281179619 +0200
+@@ -7,4 +7,4 @@
+ SRCS+=	initfini.c
+ 
+ # for -fstack-protector
+-SRCS+=	stack_protector.c
++SRCS+=	stack_protector.c getlcapid.c
+diff -rupNEZbB files_orig/usr/src/minix/include/minix/callnr.h files_modified/usr/src/minix/include/minix/callnr.h
+--- files_orig/usr/src/minix/include/minix/callnr.h	2022-05-07 17:25:00.033898549 +0200
++++ files_modified/usr/src/minix/include/minix/callnr.h	2022-05-07 17:20:06.840196095 +0200
+@@ -58,8 +58,9 @@
+ #define PM_GETEPINFO		(PM_BASE + 45)
+ #define PM_GETPROCNR		(PM_BASE + 46)
+ #define PM_GETSYSINFO		(PM_BASE + 47)
++#define PM_GETLCAPID		(PM_BASE + 48)
+ 
+-#define NR_PM_CALLS		48	/* highest number from base plus one */
++#define NR_PM_CALLS		49	/* highest number from base plus one */
+ 
+ /*===========================================================================*
+  *				Calls to VFS				     *
+diff -rupNEZbB files_orig/usr/src/minix/servers/pm/do_getlcapid.c files_modified/usr/src/minix/servers/pm/do_getlcapid.c
+--- files_orig/usr/src/minix/servers/pm/do_getlcapid.c	1970-01-01 01:00:00.000000000 +0100
++++ files_modified/usr/src/minix/servers/pm/do_getlcapid.c	2022-05-08 18:13:07.116146053 +0200
+@@ -0,0 +1,73 @@
++#include <assert.h>
++#include <sys/types.h>
++#include "pm.h"
++#include "mproc.h"
++
++#define NO_IDX (-1)
++
++static int get_idx_in_mproc(pid_t pid)
++{
++    for (int i = 0; i < NR_PROCS; i++) {
++        int in_use = mproc[i].mp_flags & IN_USE;
++        if (in_use && pid == mproc[i].mp_pid) {
++            return i;
++        }
++    }
++    return NO_IDX;
++}
++
++static int fill_path(int idx, int* path)
++{
++    int path_len = 1;
++
++    path[0] = idx;
++    for (int i = 0; mproc[path[i]].mp_pid != 1; i++) {
++        path[i + 1] = mproc[path[i]].mp_parent;
++        path_len++;
++    }
++
++    return path_len;
++}
++
++static int get_lca(int* path_1, int len_1, int* path_2, int len_2)
++{
++    assert(len_1 > 1 && len_2 > 1);
++
++    int i = len_1 - 1, j = len_2 - 1;
++    while ((i > 0 && j > 0) && (path_1[i] == path_2[j])) {
++        i--;
++        j--;
++    }    
++    return mproc[path_1[i + 1]].mp_pid;
++}
++
++int do_getlcapid(void)
++{
++    pid_t pid_1 = m_in.m1_i1;
++    pid_t pid_2 = m_in.m1_i2;
++
++    int idx_1 = get_idx_in_mproc(pid_1);
++    if (idx_1 == NO_IDX) {
++        return EINVAL;  // If the process doesn't exist or is not in use, then it's an error
++    }
++
++    int idx_2 = get_idx_in_mproc(pid_2);
++    if (idx_2 == NO_IDX) {
++        return EINVAL;  // If the process doesn't exist or is not in use, then it's an error
++    }
++
++    int path_1[NR_PROCS + 1];
++    int path_2[NR_PROCS + 1];
++
++    int len_1 = fill_path(idx_1, path_1);
++    if (len_1 == 1) {
++        return ESRCH; // If either process is the root, the provided LCA definition makes us treat this as an error
++    }
++
++    int len_2 = fill_path(idx_2, path_2);
++    if (len_2 == 1) {
++        return ESRCH; // If either process is the root, the provided LCA definition makes us treat this as an error
++    }
++
++    return get_lca(path_1, len_1, path_2, len_2);
++}
+diff -rupNEZbB files_orig/usr/src/minix/servers/pm/Makefile files_modified/usr/src/minix/servers/pm/Makefile
+--- files_orig/usr/src/minix/servers/pm/Makefile	2022-05-07 17:25:23.520656081 +0200
++++ files_modified/usr/src/minix/servers/pm/Makefile	2022-05-07 17:18:34.379838109 +0200
+@@ -4,7 +4,7 @@
+ PROG=	pm
+ SRCS=	main.c forkexit.c exec.c time.c alarm.c \
+ 	signal.c utility.c table.c trace.c getset.c misc.c \
+-	profile.c mcontext.c schedule.c
++	profile.c mcontext.c schedule.c do_getlcapid.c
+ 
+ DPADD+=	${LIBSYS} ${LIBTIMERS}
+ LDADD+=	-lsys -ltimers
+diff -rupNEZbB files_orig/usr/src/minix/servers/pm/proto.h files_modified/usr/src/minix/servers/pm/proto.h
+--- files_orig/usr/src/minix/servers/pm/proto.h	2022-05-07 17:25:30.701139886 +0200
++++ files_modified/usr/src/minix/servers/pm/proto.h	2022-05-08 16:35:53.499631967 +0200
+@@ -89,3 +89,6 @@ struct mproc *find_proc(pid_t lpid);
+ int nice_to_priority(int nice, unsigned *new_q);
+ int pm_isokendpt(int ep, int *proc);
+ void tell_vfs(struct mproc *rmp, message *m_ptr);
++
++/* do_getlcapid.c */
++int do_getlcapid(void);
+diff -rupNEZbB files_orig/usr/src/minix/servers/pm/table.c files_modified/usr/src/minix/servers/pm/table.c
+--- files_orig/usr/src/minix/servers/pm/table.c	2022-05-07 17:25:40.135283216 +0200
++++ files_modified/usr/src/minix/servers/pm/table.c	2022-05-07 17:19:22.360023884 +0200
+@@ -58,5 +58,6 @@ int (* const call_vec[NR_PM_CALLS])(void
+ 	CALL(PM_EXEC_RESTART)	= do_execrestart,
+ 	CALL(PM_GETEPINFO)	= do_getepinfo,		/* getepinfo(2) */
+ 	CALL(PM_GETPROCNR)	= do_getprocnr,		/* getprocnr(2) */
+-	CALL(PM_GETSYSINFO)	= do_getsysinfo		/* getsysinfo(2) */
++	CALL(PM_GETSYSINFO)	= do_getsysinfo,	/* getsysinfo(2) */
++	CALL(PM_GETLCAPID) = do_getlcapid		/* getlcapid(2) */
+ };
