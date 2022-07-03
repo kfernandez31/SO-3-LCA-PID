@@ -2,7 +2,7 @@
 https://gitlab.com/mimuw-rocznik-2001/so-2022/testy-zad3
 
 ## Testy oficjalne
-https://github.com/kfernandez31/SO-3-LCA-PID/tree/main/tests
+https://github.com/kfernandez31/SO-3-Process-LCA/tree/main/src/tests
 
 ## Opis wyników i testów
 
