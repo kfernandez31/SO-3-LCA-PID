@@ -1,10 +1,11 @@
-## Testy rocznikowe
+# Student tests
 https://gitlab.com/mimuw-rocznik-2001/so-2022/testy-zad3
 
-## Testy oficjalne
+# Official tests
 https://github.com/kfernandez31/SO-3-Process-LCA/tree/main/src/test
 
-## Opis wyników i testów
+---
+# Opis wyników i testów
 
 Podczas testowania w tle było budowane drzewo procesów, generowane przez `./fork_tree 7 2`.
 
@@ -12,7 +13,7 @@ Testy były oceniane binarnie – test albo przechodzi, albo nie.
 
 W komentarzach są wypisane identyfikatory testów, których rozwiązanie nie przeszło, wraz z komunikatem błędu.
 
-### Testy poprawnościowe: (warte w sumie 3 pkt.)
+## Testy poprawnościowe: (warte w sumie 3 pkt.)
 - `tree_one_level` (skrót v1, warty 0,8 pkt.) - zapytania o lca procesów na tym samym poziomie w drzewie
 
 - `tree_random_queries` (skrót v2, warty 0,8 pkt.) - losowe zapytania na drzewie procesów
@@ -23,7 +24,7 @@ W komentarzach są wypisane identyfikatory testów, których rozwiązanie nie pr
 
 - `check_contants` (skrót c, warty 0,5 pkt.) - prosty test sprawdzający zdefiniowane stałe w pliku callnr.h
 
-### Testy sprawdzające errno: (warte w sumie 2 pkt.)
+## Testy sprawdzające errno: (warte w sumie 2 pkt.)
 - `invalid_pid` (skrót e1, warty 0,7 pkt.) - zapytania o nieistniejące procesy oraz ujemne pidy
 
 - `invalid_pid_init` (skrót e2, warty 0,3 pkt.) - zapytania o nieistniejący proces i proces init, czyli korzeń drzewa procesów
