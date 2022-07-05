@@ -4,7 +4,7 @@ What you see is a repository of my solution for task no. 3. of the [Operating Sy
 
 # Brief description
 
-The task was to TODO
+The task was to write a userspace system call for the operating system [Minix](https://github.com/Stichting-MINIX-Research-Foundation/minix/tree/R3.3.0) that returns the pid (process ID) of the [LCA (lowest common ancestor)](https://en.wikipedia.org/wiki/Lowest_common_ancestor) of two processes.
 
 # Full description 
 
